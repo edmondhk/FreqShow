@@ -79,7 +79,8 @@ ui.Button.border_px    = 2
 if __name__ == '__main__':
 	# Initialize pygame and SDL to use the PiTFT display and touchscreen.
 	os.putenv('SDL_VIDEODRIVER', 'fbcon')
-	os.putenv('SDL_FBDEV'      , '/dev/fb0')
+	os.putenv('SDL_FBDEV'      , '/dev/fb0')	#Comment this if using adafruit screen or other SPI display
+	#os.putenv('SDL_FBDEV'      , '/dev/fb1') 	 Uncomment this if using adafruit screen or other SPI display
 	os.putenv('SDL_MOUSEDRV'   , 'TSLIB')
 	os.putenv('SDL_MOUSEDEV'   , '/dev/input/touchscreen')
 	pygame.display.init()
@@ -117,12 +118,4 @@ if __name__ == '__main__':
 		#starttime = time.clock()
 		fscontroller.current().render(screen)
 		pygame.display.update()
-		"""endtime = time.clock()
-		avgtime = ((avgtime*runcount)+(endtime-starttime))/(runcount+1)
-		runcount += 1
-		if runcount % 100 == 0:
-			print(avgtime)
-			avgtime = 0
-			runcount = 0"""
-		
 	
