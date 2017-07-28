@@ -41,6 +41,8 @@ class FreqShowController(object):
 		# Start with instantaneous spectrogram.
 		self._current_view = None
 		self.change_to_instant()
+		self.peak_hold = True
+
 
 	def change_view(self, view):
 		"""Change to specified view."""
@@ -99,3 +101,16 @@ class FreqShowController(object):
 		# Create a new settings list view object because the setting values might
 		# change and need to be rendered with different values.
 		self.change_view(SettingsList(self.model, self))
+
+	def peak_reset(self, *args):
+		"""Reset peak value hold"""
+		self.model.peak_ar.fill(-100.0)
+		
+	def toggle_peakhold(self, *args):
+		"""Toggle the peakhold line."""
+		self.peak_hold = not self.peak_hold
+		return self.peak_hold
+
+	def get_peakhold(self, *args):
+		"""Return the peakhold line."""
+		return self.peak_hold

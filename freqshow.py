@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # FreqShow main application and configuration.
 # Author: Tony DiCola (tony@tonydicola.com)
 #
@@ -31,6 +32,8 @@ import controller
 import model
 import ui
 
+#import pdb
+#import cProfile
 
 # Application configuration.
 SDR_SAMPLE_SIZE = 1024	# Number of samples to grab from the radio.  Should be
@@ -39,6 +42,8 @@ SDR_SAMPLE_SIZE = 1024	# Number of samples to grab from the radio.  Should be
 CLICK_DEBOUNCE  = 0.4	# Number of seconds to wait between clicks events. Set
 						# to a few hunded milliseconds to prevent accidental
 						# double clicks from hard screen presses.
+						
+OFFSET 			= -71	# Default offset to compensate amplifier in the receiver   
 
 # Font size configuration.
 MAIN_FONT = 33
@@ -54,6 +59,7 @@ BUTTON_BG      = ( 60,  60,  60) # Dark gray
 BUTTON_FG      = (255, 255, 255) # White
 BUTTON_BORDER  = (200, 200, 200) # White/light gray
 INSTANT_LINE   = (  0, 255, 128) # Bright yellow green.
+PEAK_LINE	   = (  0, 0, 255) 	 # Blue.
 
 # Define gradient of colors for the waterfall graph.  Gradient goes from blue to
 # yellow to cyan to red.
@@ -67,27 +73,34 @@ ui.Button.border_color = BUTTON_BORDER
 ui.Button.padding_px   = 2
 ui.Button.border_px    = 2
 
+#runcount = 0
+#avgtime = 0
 
 if __name__ == '__main__':
 	# Initialize pygame and SDL to use the PiTFT display and touchscreen.
 	os.putenv('SDL_VIDEODRIVER', 'fbcon')
-	os.putenv('SDL_FBDEV'      , '/dev/fb1')
+	os.putenv('SDL_FBDEV'      , '/dev/fb0')
 	os.putenv('SDL_MOUSEDRV'   , 'TSLIB')
 	os.putenv('SDL_MOUSEDEV'   , '/dev/input/touchscreen')
 	pygame.display.init()
+	filename = os.path.dirname(__file__)
+	screen = "freqshow_splash.png"
+	filename = filename + "/" + screen
 	pygame.font.init()
-	pygame.mouse.set_visible(False)
+	pygame.mouse.set_visible(True)
 	# Get size of screen and create main rendering surface.
 	size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
 	screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 	# Display splash screen.
-	splash = pygame.image.load('freqshow_splash.png')
+	#splash = pygame.image.load('freqshow_splash.png')
+	splash = pygame.image.load(filename)
 	screen.fill(MAIN_BG)
 	screen.blit(splash, ui.align(splash.get_rect(), (0, 0, size[0], size[1])))
 	pygame.display.update()
 	splash_start = time.time()
 	# Create model and controller.
-	fsmodel = model.FreqShowModel(size[0], size[1])
+	#pdb.set_trace()
+	fsmodel = model.FreqShowModel(size[0], size[1], OFFSET)
 	fscontroller = controller.FreqShowController(fsmodel)
 	time.sleep(2.0)
 	# Main loop to process events and render current view.
@@ -100,5 +113,16 @@ if __name__ == '__main__':
 				lastclick = time.time()
 				fscontroller.current().click(pygame.mouse.get_pos())
 		# Update and render the current view.
+		#cProfile.run("fscontroller.current().render(screen)", sort="cumulative")
+		#starttime = time.clock()
 		fscontroller.current().render(screen)
 		pygame.display.update()
+		"""endtime = time.clock()
+		avgtime = ((avgtime*runcount)+(endtime-starttime))/(runcount+1)
+		runcount += 1
+		if runcount % 100 == 0:
+			print(avgtime)
+			avgtime = 0
+			runcount = 0"""
+		
+	

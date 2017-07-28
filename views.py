@@ -32,6 +32,8 @@ import pygame
 import freqshow
 import ui
 
+#debug switch
+#import pdb
 
 # Color and gradient interpolation functions used by waterfall spectrogram.
 def lerp(x, x0, x1, y0, y1):
@@ -258,6 +260,7 @@ class SettingsList(ViewBase):
 		gain_text       = 'GAIN: {0} dB'.format(model.get_gain())
 		min_text        = 'MIN: {0} dB'.format(model.get_min_string())
 		max_text        = 'MAX: {0} dB'.format(model.get_max_string())
+		peakhold_text   = 'PEAK HOLD: {0}'.format(controller.get_peakhold())
 		# Create buttons.
 		self.buttons = ui.ButtonGrid(model.width, model.height, 4, 5)
 		self.buttons.add(0, 0, centerfreq_text, colspan=4, click=self.centerfreq_click)
@@ -265,7 +268,9 @@ class SettingsList(ViewBase):
 		self.buttons.add(0, 2, gain_text,       colspan=4, click=self.gain_click)
 		self.buttons.add(0, 3, min_text,        colspan=2, click=self.min_click)
 		self.buttons.add(2, 3, max_text,        colspan=2, click=self.max_click)
-		self.buttons.add(0, 4, 'BACK', click=self.controller.change_to_main)
+		self.buttons.add(0, 4, 'OFFSET',   		colspan=1, click=self.offset_click)
+		self.buttons.add(1, 4, peakhold_text,   colspan=2, click=self.toggle_peakline)
+		self.buttons.add(3, 4, 'BACK', click=self.controller.change_to_main)
 
 	def render(self, screen):
 		# Clear view and render buttons.
@@ -325,7 +330,22 @@ class SettingsList(ViewBase):
 		self.model.set_max_intensity(value)
 		self.controller.waterfall.clear_waterfall()
 		self.controller.change_to_settings()
+	
+	def toggle_peakline(self, value):
+		#self.model.set_max_intensity(value)
+		self.controller.toggle_peakhold()
+		self.controller.change_to_settings()
+		
+	def offset_click(self, button):
+		self.controller.number_dialog('GAIN:', 'dB',
+			initial=self.model.get_offset(), accept=self.offset_accept,
+			 allow_negative=True)
 
+	def offset_accept(self, value):
+		self.model.set_offset(value)
+		self.controller.waterfall.clear_waterfall()
+		self.controller.peak_reset()
+		self.controller.change_to_settings()
 
 class SpectrogramBase(ViewBase):
 	"""Base class for a spectrogram view."""
@@ -334,11 +354,16 @@ class SpectrogramBase(ViewBase):
 		self.model      = model
 		self.controller = controller
 		self.buttons = ui.ButtonGrid(model.width, model.height, 4, 5)
+		#pdb.set_trace()
 		self.buttons.add(0, 0, 'CONFIG', click=self.controller.change_to_settings)
-		self.buttons.add(1, 0, 'SWITCH MODE', click=self.controller.toggle_main, colspan=2)
+		self.buttons.add(1, 0, 'DIS. MODE', click=self.controller.toggle_main, colspan=1)
+		self.buttons.add(2, 0, 'PEAK RESET', click=self.controller.peak_reset, colspan=1)
 		self.buttons.add(3, 0, 'QUIT', click=self.quit_click,
 			bg_color=freqshow.CANCEL_BG)
 		self.overlay_enabled = True
+		
+		
+
 
 	def render_spectrogram(self, screen):
 		"""Subclass should implement spectorgram rendering in the provided
@@ -371,6 +396,11 @@ class SpectrogramBase(ViewBase):
 				self.model.width, self.buttons.row_size)
 			freq        = self.model.get_center_freq()
 			bandwidth   = self.model.get_sample_rate()
+			data		= self.model.get_peak_data()
+			#pdb.set_trace()
+			peakvalue	= np.max(data)
+			peakwindows	= np.argmax(data)
+			peakfreq 	= peakwindows*self.model.get_fftwindow()+self.model.get_freqbase()
 			# Render minimum frequency on left.
 			label = ui.render_text('{0:0.2f} Mhz'.format(freq-bandwidth/2.0),
 				size=freqshow.MAIN_FONT)
@@ -396,6 +426,18 @@ class SpectrogramBase(ViewBase):
 				size=freqshow.MAIN_FONT)
 			screen.blit(label, ui.align(label.get_rect(), spect_rect,
 				horizontal=ui.ALIGN_LEFT, vertical=ui.ALIGN_TOP))
+			# Add peak display.(WIP)
+			# Peak intensity
+			label = ui.render_text('Peak: {0:0.2f} dB'.format(peakvalue),
+				size=freqshow.MAIN_FONT)
+			screen.blit(label, ui.align(label.get_rect(), spect_rect,
+				horizontal=ui.ALIGN_RIGHT, vertical=ui.ALIGN_TOP))
+			
+			# Peak frequence	
+			label = ui.render_text('{0:0.2f} MHz'.format(peakfreq),
+				size=freqshow.MAIN_FONT)
+			screen.blit(label, ui.align(label.get_rect(), spect_rect,
+				horizontal=ui.ALIGN_RIGHT, vertical=ui.ALIGN_TOP+0.1))
 			# Draw the buttons.
 			self.buttons.render(screen)
 		else:
@@ -458,16 +500,25 @@ class InstantSpectrogram(SpectrogramBase):
 
 	def render_spectrogram(self, screen):
 		# Grab spectrogram data.
-		freqs = self.model.get_data()
+		freqs = self.model.get_data()		
+		peak_on = self.controller.get_peakhold()
 		# Scale frequency values to fit on the screen based on the min and max
 		# intensity values.
 		x, y, width, height = screen.get_rect()
 		freqs = height-np.floor(((freqs-self.model.min_intensity)/self.model.range)*height)
+		if peak_on:
+			peak  = self.model.get_peak_data()
+			peak  = height-np.floor(((peak-self.model.min_intensity)/self.model.range)*height)
+			plast = peak[0]
 		# Render frequency graph.
 		screen.fill(freqshow.MAIN_BG)
 		# Draw line segments to join each FFT result bin.
-		ylast = freqs[0]
+		ylast = freqs[0]		
 		for i in range(1, width):
 			y = freqs[i]
 			pygame.draw.line(screen, freqshow.INSTANT_LINE, (i-1, ylast), (i, y))
+			if peak_on:
+				p = peak[i]
+				pygame.draw.line(screen, freqshow.PEAK_LINE, (i-1, plast), (i, p))
+				plast = p
 			ylast = y

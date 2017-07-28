@@ -73,7 +73,7 @@ class Button(object):
 	border_color = (200, 200, 200)
 	padding_px   = 2
 	border_px    = 2
-	font_size    = 33
+	font_size    = 30
 
 	def __init__(self, rect, text, click=None, font_size=None, bg_color=None):
 		"""Create a button at the provided rect (tuple of x, y, width, height)

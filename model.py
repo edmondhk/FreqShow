@@ -27,25 +27,38 @@ from rtlsdr import *
 
 import freqshow
 
+from cookielib import offset_from_tz_string
+
 
 class FreqShowModel(object):
-	def __init__(self, width, height):
+	def __init__(self, width, height, def_offset):
 		"""Create main FreqShow application model.  Must provide the width and
 		height of the screen in pixels.
 		"""
 		# Set properties that will be used by views.
 		self.width = width
 		self.height = height
+		
+		self.offset = 0.0
+		self.set_offset(def_offset)
+		
 		# Initialize auto scaling both min and max intensity (Y axis of plots).
-		self.min_auto_scale = True
-		self.max_auto_scale = True
-		self.set_min_intensity('AUTO')
-		self.set_max_intensity('AUTO')
+		self.min_auto_scale = False
+		self.max_auto_scale = False
+		self.set_min_intensity('-100')
+		self.set_max_intensity('-30')
 		# Initialize RTL-SDR library.
 		self.sdr = RtlSdr()
-		self.set_center_freq(90.3)
+		self.set_center_freq(918)
 		self.set_sample_rate(2.4)
-		self.set_gain('AUTO')
+		self.set_gain('0')
+
+		# Keep history data for peak hold function
+		self.peak_ar = np.full((640,),-100 , dtype=float)
+		
+		self.center_freq = self.get_center_freq()
+		self.bandwidth = self.get_sample_rate()	
+
 
 	def _clear_intensity(self):
 		if self.min_auto_scale:
@@ -165,6 +178,8 @@ class FreqShowModel(object):
 		freqs = np.fft.fftshift(freqs)
 		# Convert to decibels.
 		freqs = 20.0*np.log10(freqs)
+		# add offset
+		freqs = freqs + self.offset
 		# Update model's min and max intensities when auto scaling each value.
 		if self.min_auto_scale:
 			min_intensity = np.min(freqs)
@@ -176,5 +191,36 @@ class FreqShowModel(object):
 				else max(max_intensity, self.max_intensity)
 		# Update intensity range (length between min and max intensity).
 		self.range = self.max_intensity - self.min_intensity
+		# Update peak data.
+		#pdb.set_trace()
+		oldpeak = self.peak_ar
+		self.peak_ar = np.fmax(freqs,oldpeak) 
 		# Return frequency intensities.
 		return freqs
+	
+	def get_peak_data(self):
+	#Return peak data
+		return self.peak_ar
+	
+	def get_fftwindow(self):
+		"""return frequency range of each element in the data array"""
+		fftwindow = self.get_sample_rate()/self.peak_ar.size
+		return fftwindow
+			
+	def get_freqbase(self):
+		"""return lowest frequency of data array represent""" 
+		freqbase = self.get_center_freq()-self.get_sample_rate()/2+self.get_fftwindow()/2
+		return freqbase
+	
+	def get_offset(self):
+		"""Return offset to the intensity in dB."""
+		return self.offset
+	
+	def set_offset(self, new_offset):
+		"""Set offset to the intensity in dB."""
+		try:
+			self.offset = float(new_offset)			
+		except IOError:
+			# Error setting value, ignore it for now but in the future consider
+			# adding an error message dialog.
+			pass
